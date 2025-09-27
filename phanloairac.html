@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Phân loại rác đúng cách</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #e6f7e6;
+    }
+    h1 {
+      color: #2d6a4f;
+    }
+    #game-area {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 30px;
+    }
+    .bin {
+      width: 150px;
+      height: 200px;
+      border: 3px solid #555;
+      border-radius: 10px;
+      background: #f0f0f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .bin[data-type="huu-co"] { background: #d4f4dd; }
+    .bin[data-type="tai-che"] { background: #d4e4f4; }
+    .bin[data-type="khac"] { background: #f4e4d4; }
+    .item {
+      margin-top: 20px;
+      font-size: 22px;
+      padding: 10px 15px;
+      border: 1px solid #333;
+      border-radius: 5px;
+      background: #fff;
+      cursor: grab;
+      display: inline-block;
+    }
+    #score, #timer, #result {
+      margin-top: 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    #result { color: #333; }
+    #timer { color: #1d3557; }
+    #restart-btn {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #2d6a4f;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #restart-btn:hover {
+      background: #40916c;
+    }
+  </style>
+</head>
+<body>
+  <h1>Phân loại rác đúng cách</h1>
+  <p>Kéo rác vào thùng phù hợp trong 10 giây!</p>
+
+  <div id="game-area">
+    <div class="bin" data-type="huu-co">♻️ Hữu cơ</div>
+    <div class="bin" data-type="tai-che">🔄 Tái chế</div>
+    <div class="bin" data-type="khac">🗑️ Khác/Ng</div>
+  </div>
+
+  <div id="items"></div>
+
+  <div id="score">Điểm: 0</div>
+  <div id="timer">⏳ Thời gian: 10</div>
+  <div id="result"></div>
+  <button id="restart-btn">🔄 Chơi lại</button>
+
+  <script>
+    const allItems = [
+      // Hữu cơ
+      { name: "🍌 Vỏ chuối", type: "huu-co" },
+      { name: "🍎 Vỏ táo", type: "huu-co" },
+      { name: "🍊 Vỏ cam", type: "huu-co" },
+      { name: "🥦 Rau thừa", type: "huu-co" },
+      { name: "🥕 Vỏ cà rốt", type: "huu-co" },
+      { name: "🥔 Vỏ khoai tây", type: "huu-co" },
+      { name: "🌽 Bắp ngô ăn dở", type: "huu-co" },
+      { name: "🍚 Cơm thừa", type: "huu-co" },
+      { name: "🥩 Xương gà", type: "huu-co" },
+      { name: "🥬 Lá rau hỏng", type: "huu-co" },
+
+      // Tái chế
+      { name: "🥤 Chai nhựa", type: "tai-che" },
+      { name: "📄 Giấy vụn", type: "tai-che" },
+      { name: "📰 Báo cũ", type: "tai-che" },
+      { name: "🍾 Chai thủy tinh", type: "tai-che" },
+      { name: "🥫 Lon nước ngọt", type: "tai-che" },
+      { name: "📦 Thùng carton", type: "tai-che" },
+      { name: "🧴 Chai dầu gội", type: "tai-che" },
+      { name: "🧃 Hộp sữa giấy", type: "tai-che" },
+      { name: "🥤 Ly nhựa", type: "tai-che" },
+      { name: "💿 Đĩa CD cũ", type: "tai-che" },
+
+      // Khác/Nguy hại
+      { name: "🛍️ Túi nilon", type: "khac" },
+      { name: "🔋 Pin cũ", type: "khac" },
+      { name: "💡 Bóng đèn vỡ", type: "khac" },
+      { name: "🪠 Găng tay cao su hỏng", type: "khac" },
+      { name: "💊 Thuốc hết hạn", type: "khac" },
+      { name: "🧪 Hóa chất tẩy rửa", type: "khac" },
+      { name: "🎨 Sơn thừa", type: "khac" },
+      { name: "🧯 Bình xịt", type: "khac" },
+      { name: "🧷 Kim băng gỉ", type: "khac" },
+      { name: "🪥 Bàn chải cũ", type: "khac" }
+    ];
+
+    let itemsData = [];
+    let score = 0;
+    let currentItem = null;
+    let timer = 10;
+    let countdown;
+
+    function getNextItem() {
+      clearInterval(countdown);
+      if (score >= 20) {
+        endGame("🎉 Bạn đã thắng với 20 điểm!");
+        return;
+      }
+      if (itemsData.length === 0) {
+        endGame("🎮 Hết rác! Điểm cuối cùng: " + score);
+        return;
+      }
+      const index = Math.floor(Math.random() * itemsData.length);
+      currentItem = itemsData.splice(index, 1)[0];
+
+      const itemsDiv = document.getElementById("items");
+      itemsDiv.innerHTML = "";
+      const div = document.createElement("div");
+      div.className = "item";
+      div.textContent = currentItem.name;
+      div.draggable = true;
+
+      div.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text", "item");
+      });
+
+      itemsDiv.appendChild(div);
+
+      // reset timer
+      timer = 10;
+      document.getElementById("timer").textContent = "⏳ Thời gian: " + timer;
+
+      countdown = setInterval(() => {
+        timer--;
+        document.getElementById("timer").textContent = "⏳ Thời gian: " + timer;
+        if (timer <= 0) {
+          clearInterval(countdown);
+          score -= 1;
+          document.getElementById("result").textContent = "⌛ Hết giờ! Trừ 1 điểm.";
+          document.getElementById("result").style.color = "orange";
+          document.getElementById("score").textContent = "Điểm: " + score;
+          getNextItem();
+        }
+      }, 1000);
+    }
+
+    function endGame(message) {
+      clearInterval(countdown);
+      document.getElementById("result").textContent = message;
+      document.getElementById("items").innerHTML = "";
+      document.getElementById("restart-btn").style.display = "inline-block";
+    }
+
+    document.querySelectorAll(".bin").forEach(bin => {
+      bin.addEventListener("dragover", (e) => {
+        e.preventDefault();
+      });
+      bin.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (!currentItem) return;
+
+        clearInterval(countdown);
+
+        if (bin.dataset.type === currentItem.type) {
+          score += 1;
+          document.getElementById("result").textContent = "✅ Chính xác!";
+          document.getElementById("result").style.color = "green";
+        } else {
+          score -= 1;
+          document.getElementById("result").textContent =
+            "❌ Sai rồi! Món này thuộc loại: " + currentItem.type;
+          document.getElementById("result").style.color = "red";
+        }
+        document.getElementById("score").textContent = "Điểm: " + score;
+        getNextItem();
+      });
+    });
+
+    document.getElementById("restart-btn").addEventListener("click", () => {
+      startGame();
+    });
+
+    function startGame() {
+      itemsData = [...allItems];
+      score = 0;
+      document.getElementById("score").textContent = "Điểm: 0";
+      document.getElementById("result").textContent = "";
+      document.getElementById("restart-btn").style.display = "none";
+      getNextItem();
+    }
+
+    // Bắt đầu game
+    startGame();
+  </script>
+</body>
+</html>
